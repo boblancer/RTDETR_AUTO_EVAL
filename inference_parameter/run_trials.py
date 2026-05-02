@@ -14,11 +14,14 @@ from pathlib import Path
 import yaml
 
 # Inference command
+#Change this
+# INFERENCE_CMD = "python3 ../deepSORT_rtdetr.py --config {config} -i {video} --csv"
+
 INFERENCE_CMD = "python3 ../deepSORT_rtdetr.py --config {config} -i {video} --csv"
-EVAL_CMD = "python3 evaluate_detections.py --gt ./camera1/ground_truth.csv --pred {predictions} --out {results} --iou 0.5"
+EVAL_CMD = "python3 evaluate_detections.py --gt ./camera_1/gt.csv --pred {predictions} --out {results} --iou 0.5"
 
 def predictions_path(video: Path) -> str:
-    return video.stem + ".csv"   # adjust if your script writes a fixed filename
+    return str(video.parent / (video.stem + "_rtdetr.csv"))
 
 
 def run(cmd):
@@ -48,11 +51,12 @@ def main():
 
     print("ALL trials", trials)
     for trial in trials:
-        print(f"\n{trial.stem}")
-        results_json = f"_eval_{trial.stem}.json"
+        results_dir  = f"eval_{trial.stem}"
+        results_json = f"{results_dir}/evaluation_results.json"
+
 
         run(INFERENCE_CMD.format(config=trial, video=video))
-        run(EVAL_CMD.format(predictions=predictions_path(video), results=results_json))
+        run(EVAL_CMD.format(predictions=predictions_path(video), results=results_dir))
 
         with open(results_json) as f:
             metrics = json.load(f)
