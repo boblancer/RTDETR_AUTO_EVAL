@@ -34,12 +34,12 @@ def camera_videos_dir(camera: str = "camera_1") -> Path:
 
 def default_trials_dir() -> Path:
     """Default sweep output directory."""
-    return runs_dir() / "camera_1" / "trials"
+    return inference_dir() / "trials" / "camera_1"
 
 
 def default_ground_truth() -> Path:
-    """First existing candidate under `data/camera_1/`."""
-    cam = camera_data_dir("camera_1")
+    """First existing candidate under `inference_parameter/camera_1/`."""
+    cam = inference_dir() / "camera_1"
     for name in ("ground_truth.csv", "gt.csv"):
         p = cam / name
         if p.is_file():
@@ -53,21 +53,21 @@ def default_eval_video() -> Path | None:
     or `<stem>.mp4` matching a single `*_rtdetr.csv` predictions file.
     Returns None if no candidate file exists on disk.
     """
-    vids = camera_videos_dir("camera_1")
-    trim5 = vids / "trim5.mp4"
+    cam = inference_dir() / "camera_1"
+    trim5 = cam / "trim5.mp4"
     if trim5.is_file():
         return trim5
-    mp4s = sorted(vids.glob("*.mp4"))
+    mp4s = sorted(cam.glob("*.mp4"))
     if len(mp4s) == 1:
         return mp4s[0]
-    for pred in sorted(vids.glob("*_rtdetr.csv")):
+    for pred in sorted(cam.glob("*_rtdetr.csv")):
         base = pred.name
         if not base.endswith("_rtdetr.csv"):
             continue
         stem = base[: -len("_rtdetr.csv")]
         if not stem:
             continue
-        cand = vids / f"{stem}.mp4"
+        cand = cam / f"{stem}.mp4"
         if cand.is_file():
             return cand
     return None
@@ -93,7 +93,7 @@ def resolve_eval_video(path: Path | None) -> Path:
         return p
     dv = default_eval_video()
     if dv is None or not dv.is_file():
-        cam = camera_videos_dir("camera_1")
+        cam = inference_dir() / "camera_1"
         raise FileNotFoundError(
             f"No default video in {cam} (e.g. trim5.mp4). Pass --video."
         )
