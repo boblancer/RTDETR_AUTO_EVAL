@@ -7,7 +7,15 @@ from pathlib import Path
 
 from rtdetr_eval.evaluate import run_evaluation
 from rtdetr_eval.generate import generate_trials
-from rtdetr_eval.paths import default_ground_truth, inference_dir, repo_root
+from rtdetr_eval.paths import (
+    default_eval_video,
+    default_ground_truth,
+    default_trials_dir,
+    inference_dir,
+    repo_root,
+    resolve_eval_video,
+    resolve_ground_truth,
+)
 from rtdetr_eval.trials import run_trials
 
 
@@ -21,12 +29,27 @@ def _build_parser() -> argparse.ArgumentParser:
     g = sub.add_parser("generate", help="Sample trial YAMLs from a base config")
     g.add_argument("--config", type=Path, required=True, help="Base YAML template")
     g.add_argument("--n", type=int, default=50, help="Number of new trials")
-    g.add_argument("--out-dir", type=Path, required=True, help="Directory for trial_*.yaml + manifest.json")
+    g.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help=f"Directory for trial_*.yaml + manifest.json (default: {default_trials_dir()})",
+    )
     g.add_argument("--seed", type=int, default=None)
 
     r = sub.add_parser("run-trials", help="Run each trial on a video and write best_config.yaml")
-    r.add_argument("--trials-dir", type=Path, required=True)
-    r.add_argument("--video", type=Path, required=True)
+    r.add_argument(
+        "--trials-dir",
+        type=Path,
+        default=None,
+        help=f"Trial YAML directory (default: {default_trials_dir()})",
+    )
+    r.add_argument(
+        "--video",
+        type=Path,
+        default=None,
+        help="Input video (default: data/camera_1/videos/trim5.mp4 if present)",
+    )
     r.add_argument("--gt", type=Path, default=None)
     r.add_argument("--iou", type=float, default=0.5)
     r.add_argument("--infer-script", type=Path, default=None)
@@ -42,10 +65,20 @@ def _build_parser() -> argparse.ArgumentParser:
 
     f = sub.add_parser("full", help="generate then run-trials (one command)")
     f.add_argument("--config", type=Path, required=True, help="Base YAML template")
-    f.add_argument("--trials-dir", type=Path, required=True)
+    f.add_argument(
+        "--trials-dir",
+        type=Path,
+        default=None,
+        help=f"Trial YAML directory (default: {default_trials_dir()})",
+    )
     f.add_argument("--n", type=int, default=50)
     f.add_argument("--seed", type=int, default=None)
-    f.add_argument("--video", type=Path, required=True)
+    f.add_argument(
+        "--video",
+        type=Path,
+        default=None,
+        help="Input video (default: data/camera_1/videos/trim5.mp4 if present)",
+    )
     f.add_argument("--gt", type=Path, default=None)
     f.add_argument("--iou", type=float, default=0.5)
     f.add_argument("--infer-script", type=Path, default=None)
@@ -58,17 +91,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _resolve_gt(path: Path | None) -> Path:
-    if path is not None:
-        return path.resolve()
-    d = default_ground_truth()
-    if not d.is_file():
-        raise FileNotFoundError(
-            f"No default GT CSV found at {d}. Pass --gt explicitly."
-        )
-    return d
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -77,12 +99,16 @@ def main(argv: list[str] | None = None) -> None:
         root = repo_root()
         print(f"repo_root:          {root}")
         print(f"inference_parameter: {inference_dir()}")
-        print(f"default --gt:       {default_ground_truth()}")
-        print(f"deepSORT_rtdetr:    {root / 'deepSORT_rtdetr.py'}")
+        print(f"default --gt:         {default_ground_truth()}")
+        print(f"default trials dir:   {default_trials_dir()}")
+        dv = default_eval_video()
+        print(f"default --video:      {dv if dv else '(none — add trim5.mp4 under data/camera_1/videos/ or pass --video)'}")
+        print(f"deepSORT_rtdetr:      {root / 'deepSORT_rtdetr.py'}")
         return
 
     if args.command == "generate":
-        generate_trials(args.config.resolve(), args.out_dir.resolve(), args.n, args.seed)
+        out_dir = args.out_dir if args.out_dir is not None else default_trials_dir()
+        generate_trials(args.config.resolve(), out_dir.resolve(), args.n, args.seed)
         return
 
     if args.command == "eval":
@@ -90,10 +116,13 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.command == "run-trials":
-        gt = _resolve_gt(args.gt)
+        if args.trials_dir is None:
+            args.trials_dir = default_trials_dir()
+        gt = resolve_ground_truth(args.gt)
+        video = resolve_eval_video(args.video)
         run_trials(
             args.trials_dir.resolve(),
-            args.video,
+            video,
             gt,
             infer_script=args.infer_script,
             inference_cwd=args.inference_cwd,
@@ -104,11 +133,14 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.command == "full":
-        gt = _resolve_gt(args.gt)
+        if args.trials_dir is None:
+            args.trials_dir = default_trials_dir()
+        gt = resolve_ground_truth(args.gt)
+        video = resolve_eval_video(args.video)
         generate_trials(args.config.resolve(), args.trials_dir.resolve(), args.n, args.seed)
         run_trials(
             args.trials_dir.resolve(),
-            args.video,
+            video,
             gt,
             infer_script=args.infer_script,
             inference_cwd=args.inference_cwd,

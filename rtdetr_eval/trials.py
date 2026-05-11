@@ -14,7 +14,13 @@ from pathlib import Path
 import yaml
 
 from rtdetr_eval.evaluate import run_evaluation
-from rtdetr_eval.paths import default_ground_truth, inference_dir, repo_root
+from rtdetr_eval.paths import (
+    default_eval_video,
+    default_ground_truth,
+    default_trials_dir,
+    inference_dir,
+    repo_root,
+)
 
 
 def predictions_path(video: Path) -> Path:
@@ -139,8 +145,18 @@ def run_trials(
 
 def main():
     p = argparse.ArgumentParser(description="Run trial configs on a video and pick the best.")
-    p.add_argument("--trials-dir", type=Path, required=True)
-    p.add_argument("--video", type=Path, required=True)
+    p.add_argument(
+        "--trials-dir",
+        type=Path,
+        default=None,
+        help=f"Trial YAML directory (default: {default_trials_dir()})",
+    )
+    p.add_argument(
+        "--video",
+        type=Path,
+        default=None,
+        help="Input video (default: data/camera_1/videos/trim5.mp4 if present)",
+    )
     p.add_argument(
         "--gt",
         type=Path,
@@ -173,6 +189,19 @@ def main():
     )
     args = p.parse_args()
 
+    if args.trials_dir is None:
+        args.trials_dir = default_trials_dir()
+
+    video = args.video
+    if video is None:
+        video = default_eval_video()
+    if video is None or not Path(video).expanduser().is_file():
+        cam = inference_dir() / "camera_1"
+        raise FileNotFoundError(
+            f"No default video in {cam} (e.g. trim5.mp4). Pass --video."
+        )
+    video = Path(video).expanduser().resolve()
+
     gt = args.gt
     if gt is None:
         gt = default_ground_truth()
@@ -183,7 +212,7 @@ def main():
 
     run_trials(
         Path(args.trials_dir).resolve(),
-        Path(args.video),
+        video,
         Path(gt),
         infer_script=args.infer_script,
         inference_cwd=args.inference_cwd,

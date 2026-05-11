@@ -12,6 +12,8 @@ from pathlib import Path
 
 import yaml
 
+from rtdetr_eval.paths import default_trials_dir
+
 SEARCH_SPACE = [
     {"path": "inference.confidence", "type": "float", "low": 0.40, "high": 0.85, "dp": 2},
     {"path": "inference.iou", "type": "float", "low": 0.50, "high": 0.85, "dp": 2},
@@ -142,10 +144,16 @@ def main():
     p = argparse.ArgumentParser(description="Generate randomised trial configs.")
     p.add_argument("--config", required=True, help="Base YAML template")
     p.add_argument("--n", type=int, default=50, help="Number of trials (default: 50)")
-    p.add_argument("--out-dir", type=Path, default=Path("trials"), help="Output directory")
+    p.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help=f"Output directory (default: {default_trials_dir()})",
+    )
     p.add_argument("--seed", type=int, default=None, help="Random seed")
     args = p.parse_args()
-    generate_trials(Path(args.config).resolve(), Path(args.out_dir).resolve(), args.n, args.seed)
+    out = args.out_dir if args.out_dir is not None else default_trials_dir()
+    generate_trials(Path(args.config).resolve(), out.resolve(), args.n, args.seed)
 
 
 if __name__ == "__main__":
