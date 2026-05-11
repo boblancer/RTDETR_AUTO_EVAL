@@ -52,14 +52,21 @@ def evaluate(gt_csv, pred_csv, iou_thresh):
 
     for frame in all_frames:
         gts = gt_map.get(frame, [])
-        preds = sorted(pred_map.get(frame, []), key=lambda x: x.get("confidence", 0), reverse=True)
+        preds = sorted(
+            pred_map.get(frame, []),
+            key=lambda x: (x.get("confidence") or 0.0),
+            reverse=True,
+        )
 
         for gt in gts:
             total_gt[gt["class_id"]] += 1
 
         matched_gts = set()
         for pred in preds:
-            pb, pcls, conf = pred["bbox"], pred["class_id"], pred.get("confidence", 1.0)
+            pb = pred["bbox"]
+            pcls = pred["class_id"]
+            conf = pred.get("confidence")
+            conf = float(conf) if conf is not None else 0.0
             best_iou, best_idx = 0.0, -1
             for gi, gt in enumerate(gts):
                 if gi in matched_gts or gt["class_id"] != pcls:
