@@ -63,3 +63,48 @@ class TestEvaluate(unittest.TestCase):
             self.assertIn("Pedestrian", metrics["classes"])
             self.assertGreaterEqual(metrics["classes"]["Pedestrian"]["ap"], 0.0)
 
+    def test_run_evaluation_handles_weird_confidence_values(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            gt_csv = td / "gt.csv"
+            pred_csv = td / "pred.csv"
+            out_dir = td / "out"
+
+            gt_rows = [
+                {
+                    "frame": 0,
+                    "predictions_json": json.dumps(
+                        [{"bbox": [0, 0, 10, 10], "class_id": 1, "confidence": 1.0}]
+                    ),
+                }
+            ]
+
+            # confidence can be missing, a string, or an invalid type; evaluation should not crash.
+            pred_rows = [
+                {
+                    "frame": 0,
+                    "predictions_json": json.dumps(
+                        [
+                            {"bbox": [0, 0, 10, 10], "class_id": 1, "confidence": "0.9"},
+                            {"bbox": [0, 0, 10, 10], "class_id": 1},  # missing
+                            {"bbox": [50, 50, 60, 60], "class_id": 1, "confidence": {"bad": "type"}},
+                        ]
+                    ),
+                }
+            ]
+
+            pd.DataFrame(gt_rows).to_csv(gt_csv, index=False)
+            pd.DataFrame(pred_rows).to_csv(pred_csv, index=False)
+
+            metrics = run_evaluation(
+                gt_csv=gt_csv,
+                pred_csv=pred_csv,
+                out_dir=out_dir,
+                iou_thresh=0.5,
+                plots=False,
+                write_json=False,
+            )
+
+            self.assertIn("classes", metrics)
+            self.assertIn("Pedestrian", metrics["classes"])
+
