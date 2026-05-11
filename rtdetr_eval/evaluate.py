@@ -52,11 +52,14 @@ def evaluate(gt_csv, pred_csv, iou_thresh):
 
     for frame in all_frames:
         gts = gt_map.get(frame, [])
-        preds = sorted(
-            pred_map.get(frame, []),
-            key=lambda x: (x.get("confidence") or 0.0),
-            reverse=True,
-        )
+        def _confidence(p) -> float:
+            try:
+                c = p.get("confidence")  # type: ignore[attribute-defined-outside-init]
+                return float(c) if c is not None else 0.0
+            except Exception:
+                return 0.0
+
+        preds = sorted(pred_map.get(frame, []), key=_confidence, reverse=True)
 
         for gt in gts:
             total_gt[gt["class_id"]] += 1
@@ -65,8 +68,7 @@ def evaluate(gt_csv, pred_csv, iou_thresh):
         for pred in preds:
             pb = pred["bbox"]
             pcls = pred["class_id"]
-            conf = pred.get("confidence")
-            conf = float(conf) if conf is not None else 0.0
+            conf = _confidence(pred)
             best_iou, best_idx = 0.0, -1
             for gi, gt in enumerate(gts):
                 if gi in matched_gts or gt["class_id"] != pcls:
