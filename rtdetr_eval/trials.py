@@ -66,6 +66,7 @@ def run_trials(
     best_out: Path | None = None,
     eval_work: Path | None = None,
     eval_plots: bool = False,
+    top_params_k: int = 3,
 ) -> Path:
     """
     Returns path to written best_config.yaml.
@@ -77,9 +78,15 @@ def run_trials(
     eval_work = eval_work or (trials_dir / "_eval_scratch")
     eval_work.mkdir(parents=True, exist_ok=True)
 
-    trials = sorted(trials_dir.glob("trial_*.yaml"))
+    trials = sorted(
+        set(trials_dir.glob("explore_*.yaml"))
+        | set(trials_dir.glob("exploit_*.yaml"))
+        | set(trials_dir.glob("trial_*.yaml"))
+    )
     if not trials:
-        raise FileNotFoundError(f"No trial_*.yaml under {trials_dir}")
+        raise FileNotFoundError(
+            f"No explore_*.yaml / exploit_*.yaml / trial_*.yaml under {trials_dir}"
+        )
 
     video = video.resolve()
     gt_csv = gt_csv.resolve()
@@ -139,6 +146,20 @@ def run_trials(
     lb_path = best_out.parent / "trial_leaderboard.json"
     lb_path.write_text(json.dumps(leaderboard, indent=2))
     print(f"Leaderboard: {lb_path}")
+
+    # Top-K champion seeds (params + score) for Phase 2 warm-start exploitation.
+    manifest_path = trials_dir / "manifest.json"
+    manifest = {}
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text())
+    top_k = max(1, top_params_k)
+    top_seeds = [
+        {"trial": name, "score": round(s, 6), "params": manifest.get(name, {})}
+        for s, name, _ in results[:top_k]
+    ]
+    top_path = best_out.parent / "top_params.json"
+    top_path.write_text(json.dumps(top_seeds, indent=2))
+    print(f"Top seeds: {top_path}")
 
     return best_out
 
