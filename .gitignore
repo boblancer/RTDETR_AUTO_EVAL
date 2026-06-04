@@ -45,3 +45,7 @@ pip-wheel-metadata/
 
 # Matplotlib font cache if created inside the repo
 .matplotlib/
+
+# Large binary assets (model weights / videos) — keep out of git
+*.pt
+*.mp4
